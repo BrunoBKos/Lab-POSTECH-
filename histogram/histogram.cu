@@ -8,9 +8,9 @@
 #define NTHREADS 1024
 
 // headers
-void histogram_sec(int* data, size_t n, int* bins);
+void histogram_sec(int* input_data, size_t n, int* output_bin);
 
-__global__ void histogram_par(int* data, size_t n, int* bins);
+__global__ void histogram_par(int* input_data, size_t n, int* output_bin);
 
 int compare(int* a, int* b, size_t n);
 
@@ -21,53 +21,53 @@ int main(void) {
 
   // host vectors
   int* h_data;
-  int* h_out_bins_sec;
-  int* h_out_bins_par;
+  int* h_out_bin_sec;
+  int* h_out_bin_par;
 
   // device vectors
   int* d_data;
-  int* d_out_bins;
+  int* d_out_bin;
 
   // variables
   int num_blks;
 
   // mempory reserve in CPU
   h_data = (int*) malloc(Elems*sizeof(int));
-  h_out_bins_sec = (int*) malloc(BINS*sizeof(int));
-  h_out_bins_par = (int*) malloc(BINS*sizeof(int));
+  h_out_bin_sec = (int*) malloc(BINS*sizeof(int));
+  h_out_bin_par = (int*) malloc(BINS*sizeof(int));
 
   // memory reserve in GPU
   cudaMalloc(&d_data, Elems*sizeof(int));
-  cudaMalloc(&d_out_bins, BINS*sizeof(int));
+  cudaMalloc(&d_out_bin, BINS*sizeof(int));
 
   // initialization
   initialize(h_data, Elems);
-  memset(h_out_bins_sec, 0, BINS*sizeof(int));
-  memset(h_out_bins_par, 0, BINS*sizeof(int));
+  memset(h_out_bin_sec, 0, BINS*sizeof(int));
+  memset(h_out_bin_par, 0, BINS*sizeof(int));
 
   //device copy
   cudaMemcpy(d_data, h_data, Elems*sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_out_bins, h_out_bins_par, BINS*sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_out_bin, h_out_bin_par, BINS*sizeof(int), cudaMemcpyHostToDevice);
 
   // call to kernel (to make the kernel still)
   num_blks = Elems/NTHREADS;
-  histogram_par<<<num_blks, NTHREADS>>>(d_data, Elems, d_out_bins);
+  histogram_par<<<num_blks, NTHREADS>>>(d_data, Elems, d_out_bin);
 
   // secuential calculation of the results
-  histogram_sec(h_data, Elems, h_out_bins_sec);
+  histogram_sec(h_data, Elems, h_out_bin_sec);
 
   // recovery of the parallel results
-  cudaMemcpy(h_out_bins_par, d_out_bins, BINS*sizeof(int), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_out_bin_par, d_out_bin, BINS*sizeof(int), cudaMemcpyDeviceToHost);
 
   // return of the results
-  int ret = compare(h_out_bins_sec, h_out_bins_par, BINS); 
+  int ret = compare(h_out_bin_sec, h_out_bin_par, BINS); 
   if(ret) {
     printf("Error on the execution: (diferent results after index: %d)\n", ret);
     printf("Expected:");
-    for(int i = 0; i < 6; i++) printf(" %d", h_out_bins_sec[i+ret]);
+    for(int i = 0; i < 6; i++) printf(" %d", h_out_bin_sec[i+ret]);
     printf("\n");
     printf("Given:   ");
-    for(int i = 0; i < 6; i++) printf(" %d", h_out_bins_par[i+ret]);
+    for(int i = 0; i < 6; i++) printf(" %d", h_out_bin_par[i+ret]);
     printf("\n");
     return 1;
   }
@@ -78,12 +78,12 @@ int main(void) {
 }
 
 // CPU function (Histogram)
-void histogram_sec(int* data, size_t N, int* bins) { for(int i = 0; i < N; i++) bins[(data[i])]++; }
+void histogram_sec(int* input_data, size_t N, int* output_bin) { for(int i = 0; i < N; i++) output_bin[(input_data[i])]++; }
 
 // GPU kenel (vesion without sm)
-__global__ void histogram_par(int* data, size_t N, int* bins) {
+__global__ void histogram_par(int* input_data, size_t N, int* output_bin) {
   int th_id = threadIdx.x + blockDim.x*blockIdx.x; 
-  if(th_id < N) atomicAdd(bins + data[th_id], 1);
+  if(th_id < N) atomicAdd(output_bin + input_data[th_id], 1);
 }
 
 // auxiliar function to compare the values of two diferent vectors (to do: use memcmp)
