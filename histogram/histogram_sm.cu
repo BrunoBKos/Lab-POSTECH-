@@ -69,12 +69,21 @@ int main(void) {
     printf("Given:   ");
     for(int i = 0; i < 6; i++) printf(" %d", h_out_bin_par[i+ret]);
     printf("\n");
-    return 1;
+    exit(1);
   }
-  else {
-    printf("Correct execution: Success\n");
-    return 0;
-  }
+  else printf("Correct execution: Success\n");
+
+  // free host memory
+  free(h_data);
+  free(h_out_bin_sec);
+  free(h_out_bin_par);
+
+  // free device memory
+  cudaFree(d_data);
+  cudaFree(d_out_bin);
+
+  return 0;
+  
 }
 
 // CPU function (Histogram)

@@ -72,12 +72,23 @@ int main(void) {
     printf("Given:   ");
     for(int i = 0; i < 6; i++) printf(" %f", h_output_par[i+ret]);
     printf("\n");
-    return 1;
+    exit(1);
   }
-  else {
-    printf("Correct execution: Success\n");
-    return 0;
-  }
+  else printf("Correct execution: Success\n");
+
+  // free host memory
+  free(h_weight);
+  free(h_input);
+  free(h_output_sec);
+  free(h_output_par);
+
+  // free device memory
+  cudaFree(d_weight);
+  cudaFree(d_input);
+  cudaFree(d_output);
+
+  return 0;
+
 }
 
 // CPU function for the secuential product between matrix and vector

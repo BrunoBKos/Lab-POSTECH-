@@ -1,6 +1,6 @@
-out: histogram.cu
-	/usr/local/cuda/bin/nvcc histogram.cu -o histogram
-sm: histogram_sm.cu
-	/usr/local/cuda/bin/nvcc histogram_sm.cu -o histogram_sm
+out: softmax.cu
+	/usr/local/cuda/bin/nvcc softmax.cu -o softmax -lm
+sm: softmax_sm.cu
+	/usr/local/cuda/bin/nvcc softmax_sm.cu -o softmax_sm -lm
 clean:
-	rm -rf histogram histogram_sm
+	rm -rf softmax softmax_sm

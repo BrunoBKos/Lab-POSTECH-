@@ -64,12 +64,23 @@ int main(void) {
   // return of the results
   if(compare(h_out_sec, h_out_par, Elems)) {
     printf("Error on the execution: (diferent results)\n");
-    return 1;
+    exit(1);
   }
-  else {
-    printf("Correct execution: Success\n");
-    return 0;
-  }
+  else printf("Correct execution: Success\n");
+  
+  // free host memory
+  free(h_mat);
+  free(h_vect);
+  free(h_out_sec);
+  free(h_out_par);
+
+  // free device memory
+  cudaFree(d_mat);
+  cudaFree(d_vect);
+  cudaFree(d_out);
+
+  return 0;
+
 }
 
 // CPU function for the secuential product between matrix and vector

@@ -71,10 +71,19 @@ int main(void) {
     printf("\n");
     return 1;
   }
-  else {
-    printf("Correct execution: Success\n");
-    return 0;
-  }
+  else printf("Correct execution: Success\n");
+
+  // free host memory
+  free(h_data);
+  free(h_out_bin_sec);
+  free(h_out_bin_par);
+
+  // free device memory
+  cudaFree(d_data);
+  cudaFree(d_out_bin);
+
+  return 0;
+
 }
 
 // CPU function (Histogram)
