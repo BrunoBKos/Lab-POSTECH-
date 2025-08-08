@@ -5,17 +5,20 @@
 
 #include "spcsr_generator.h"
 
-#define ROWS 32
+#define ROWS 128
+#define BIGNUM 1048576.0
 #define NTHREADS 1024
 
 // headers
-void spmv_sec(csr_spm_t* csr_spm, float* input, float* output);
+void sssp_sec(csr_spm_t* csr_spm, float* input, float* output);
 
-__global__ void spmv_par(int* rows, int num_rows, float* data, int* cols, float* input, float* output);
+__global__ void sssp_par(int* rows, int num_rows, float* data, int* cols, float* input, float* output);
 
 int compare(float* a, float* b, size_t n);
 
 void initialize(float* a, size_t n);
+
+void init_input_vector(csr_spm_t* csr_spm, float* vector);
 
 // main function
 int main(void) {
@@ -50,7 +53,7 @@ int main(void) {
   cudaMalloc(&d_output_vector, ROWS*sizeof(float));
 
   // initialitation
-  initialize(h_input_vector, ROWS);
+  init_input_vector(csr_spm, h_input_vector);
 
   //device copy
   cudaMemcpy(d_rows, (*csr_spm).rows, ROWS*sizeof(int), cudaMemcpyHostToDevice);
@@ -59,10 +62,10 @@ int main(void) {
   cudaMemcpy(d_input_vector, h_input_vector, ROWS*sizeof(float), cudaMemcpyHostToDevice);
 
   // call to GPU kernel
-  spmv_par<<<num_blks, NTHREADS>>>(d_rows, ROWS, d_data, d_cols, d_input_vector, d_output_vector);
+  sssp_par<<<num_blks, NTHREADS>>>(d_rows, ROWS, d_data, d_cols, d_input_vector, d_output_vector);
 
   // secuential calculation of the results
-  spmv_sec(csr_spm, h_input_vector, h_output_vector_sec);
+  sssp_sec(csr_spm, h_input_vector, h_output_vector_sec);
 
   // recovery of the parallel results
   cudaMemcpy(h_output_vector_par, d_output_vector, ROWS*sizeof(float), cudaMemcpyDeviceToHost);
@@ -81,7 +84,7 @@ int main(void) {
   for(int i = 0; i < ROWS; i++)
     printf(" %f,", h_output_vector_par[i]);
   printf("\n");
-  
+
   // resources release (host)
   free_csr_spm(csr_spm);
   if(h_input_vector) free(h_input_vector);
@@ -102,7 +105,7 @@ int main(void) {
 // CPU (secuential) version of the spmv algorithm //
 ////////////////////////////////////////////////////
 
-void spmv_sec(csr_spm_t* csr_spm, float* input, float* output) {
+void sssp_sec(csr_spm_t* csr_spm, float* input, float* output) {
 
   int num_rows = (*csr_spm).num_rows;
   int* rows = (*csr_spm).rows;
@@ -110,11 +113,12 @@ void spmv_sec(csr_spm_t* csr_spm, float* input, float* output) {
   float* data = (*csr_spm).data;
 
   for(int i = 0; i < num_rows; i++) {
-    float acum = 0;
+    float min = input[i];
     for(int j = rows[i]; j < rows[i+1]; j++) {
-      acum += data[j]*(input[(cols[j])]);
+      float min_update = (data[j] + input[(cols[j])]);
+      if(min_update < min) min = min_update;
     }
-    output[i] = acum;
+    output[i] = min;
   }
 
 }
@@ -123,15 +127,16 @@ void spmv_sec(csr_spm_t* csr_spm, float* input, float* output) {
 // GPU Kernels of the spmv algorithym (parallel version) //
 ///////////////////////////////////////////////////////////
 
-__global__ void spmv_par(int* rows, int num_rows, float* data, int* cols, float* input, float* output) {
+__global__ void sssp_par(int* rows, int num_rows, float* data, int* cols, float* input, float* output) {
 
   int th_id = threadIdx.x + blockDim.x*blockIdx.x;
   if(th_id < num_rows) {
-    float acum = 0;
+    float min = input[th_id];
     for(int i = rows[th_id]; i < rows[th_id+1]; i++) {
-      acum += data[i]*(input[(cols[i])]);
+      float min_update = (data[i] + input[(cols[i])]);
+      if(min_update < min) min = min_update;
     }
-    output[th_id] = acum;
+    output[th_id] = min;
   }
 }
 
@@ -150,3 +155,21 @@ int compare(float* a, float* b, size_t n) {
 // auxiliar function to initialize vector with random positive values less than BINS
 void initialize(float* vect, size_t n){ for(int i = 0; i < n; i++) vect[i] = ((float) (rand() % 1024)); }
 
+
+
+void init_input_vector(csr_spm_t* csr_spm, float* vector) {
+
+  int num_rows = (*csr_spm).num_rows;
+  int* rows = (*csr_spm).rows;
+  int* cols = (*csr_spm).cols;
+  float* data = (*csr_spm).data;
+  
+  for(int i = 0; i < num_rows; i++) {
+    vector[i] = BIGNUM;
+  }
+  
+  for(int i = 0; i < rows[1]; i++) {
+    vector[(cols[i])] = data[i];
+  }
+
+}
